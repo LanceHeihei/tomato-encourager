@@ -15,7 +15,7 @@ jobs:
           - runner: windows-latest
             os_id: windows
             artifact_name: 番茄上班鼓励器-Windows
-          - runner: macos-13          # 原生 Intel x86_64 机器
+          - runner: macos-14          # 用 ARM 机 + Rosetta 转译出 x86_64，避开稀缺的 Intel 运行机
             os_id: macos-intel
             artifact_name: 番茄上班鼓励器-macOS-Intel
           - runner: macos-14          # 原生 Apple Silicon arm64 机器
@@ -44,12 +44,17 @@ jobs:
           --clean
           "番茄上班鼓励器.py"
 
-      - name: Build (macOS Intel .app)
+      - name: Build (macOS Intel x86_64 via Rosetta)
         if: matrix.os_id == 'macos-intel'
         env:
           MACOSX_DEPLOYMENT_TARGET: "10.13"
         run: |
-          pyinstaller --onefile --windowed \
+          sudo softwareupdate --install-rosetta --agree-to-license
+          curl -L -o /tmp/py.pkg https://www.python.org/ftp/python/3.12.7/python-3.12.7-macos11.pkg
+          sudo installer -pkg /tmp/py.pkg -target /
+          PY=/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12
+          arch -x86_64 "$PY" -m pip install --upgrade pip pyinstaller
+          arch -x86_64 "$PY" -m PyInstaller --onefile --windowed \
             --name "番茄上班鼓励器" --clean "番茄上班鼓励器.py"
           file "dist/番茄上班鼓励器.app/Contents/MacOS/番茄上班鼓励器"
 
