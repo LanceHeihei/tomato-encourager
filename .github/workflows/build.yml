@@ -9,16 +9,20 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          - runner: windows-latest
+            os_id: windows
             artifact_name: 番茄上班鼓励器-Windows
-            file_ext: exe
-          - os: macos-latest
-            artifact_name: 番茄上班鼓励器-macOS
-            file_ext: app
+          - runner: macos-13          # 原生 Intel x86_64 机器
+            os_id: macos-intel
+            artifact_name: 番茄上班鼓励器-macOS-Intel
+          - runner: macos-14          # 原生 Apple Silicon arm64 机器
+            os_id: macos-arm
+            artifact_name: 番茄上班鼓励器-macOS-AppleSilicon
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout code
@@ -32,23 +36,33 @@ jobs:
       - name: Install PyInstaller
         run: pip install pyinstaller
 
-      - name: Build (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Build (Windows exe)
+        if: matrix.os_id == 'windows'
         run: >
           pyinstaller --onefile --windowed
           --name "番茄上班鼓励器"
           --clean
           "番茄上班鼓励器.py"
 
-      - name: Build (macOS)
-        if: matrix.os == 'macos-latest'
+      - name: Build (macOS Intel .app)
+        if: matrix.os_id == 'macos-intel'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "10.13"
         run: |
           pyinstaller --onefile --windowed \
-            --name "番茄上班鼓励器" \
-            --clean \
-            "番茄上班鼓励器.py"
+            --name "番茄上班鼓励器" --clean "番茄上班鼓励器.py"
+          file "dist/番茄上班鼓励器.app/Contents/MacOS/番茄上班鼓励器"
 
-      - name: List build output
+      - name: Build (macOS Apple Silicon .app)
+        if: matrix.os_id == 'macos-arm'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          pyinstaller --onefile --windowed \
+            --name "番茄上班鼓励器" --clean "番茄上班鼓励器.py"
+          file "dist/番茄上班鼓励器.app/Contents/MacOS/番茄上班鼓励器"
+
+      - name: Show build output
         shell: bash
         run: ls -la dist/
 
@@ -61,7 +75,7 @@ jobs:
             dist/番茄上班鼓励器.app
           if-no-files-found: warn
 
-  # 可选：打 tag 时自动创建 Release
+  # 打 tag 时自动创建 Release
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
@@ -80,6 +94,8 @@ jobs:
           prerelease: false
           body: |
             ## 番茄上班鼓励器
-            - **Windows**: 下载 `番茄上班鼓励器-Windows` 里的 .exe，双击运行
-            - **macOS**: 下载 `番茄上班鼓励器-macOS` 里的 .app，拖入 Applications
-            - 首次运行如 macOS 提示"无法验证开发者"，请在 系统设置→隐私与安全性 中点击"仍要打开"
+            - **Windows**：下载 `番茄上班鼓励器-Windows` 里的 .exe，双击运行
+            - **Intel Mac（老款）**：下载 `番茄上班鼓励器-macOS-Intel`
+            - **Apple Silicon Mac（M1/M2/M3/M4）**：下载 `番茄上班鼓励器-macOS-AppleSilicon`
+            - 查看自己芯片：左上角  → 关于本机 → "芯片"一栏
+            - macOS 首次运行提示"无法验证开发者"：右键 .app → 打开 → 仍要打开（仅一次）
